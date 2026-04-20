@@ -6,6 +6,10 @@ import { run as statsCmd } from "./commands/stats.ts";
 import { run as toolsCmd } from "./commands/tools.ts";
 import { run as tokensCmd } from "./commands/tokens.ts";
 import { run as contextPressureCmd } from "./commands/context-pressure.ts";
+import { run as strugglesCmd } from "./commands/struggles.ts";
+import { run as flowCmd } from "./commands/flow.ts";
+import { run as patternsCmd } from "./commands/patterns.ts";
+import { run as searchCmd } from "./commands/search.ts";
 import { printJson } from "./lib/output.ts";
 
 const USAGE = `retro — personal coaching tool for Claude Code adoption
@@ -19,6 +23,11 @@ commands:
   retro tools [--since=7d] [--category=builtin|mcp|bash|subagent] [--human]
   retro tokens [--since=7d] [--groupby=session|model|day] [--human]
   retro context-pressure [--since=7d] [--human]
+
+  retro struggles [--top=5] [--since=7d] [--human]
+  retro flow [--top=5] [--since=7d] [--human]
+  retro patterns <regenerate-cycles|compactions|denials|idle-sessions|context-hits>
+  retro search <regex> [--since=7d] [--human]
 
   retro _debug-parse [--since=7d]
 
@@ -41,6 +50,18 @@ switch (args.cmd) {
     break;
   case "context-pressure":
     contextPressureCmd(args);
+    break;
+  case "struggles":
+    strugglesCmd(args);
+    break;
+  case "flow":
+    flowCmd(args);
+    break;
+  case "patterns":
+    patternsCmd(args);
+    break;
+  case "search":
+    searchCmd(args);
     break;
   case "_debug-parse":
     debugParse(args);
