@@ -5,11 +5,13 @@ import {
   lstatSync,
   readdirSync,
   copyFileSync,
+  writeFileSync,
   rmSync,
 } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { homedir } from "node:os";
 import type { Args } from "../lib/cli.ts";
+import { EMBEDDED_SKILL_FILES } from "../embedded.ts";
 
 export function run(args: Args): void {
   const claudeDir = join(homedir(), ".claude");
@@ -24,28 +26,43 @@ export function run(args: Args): void {
   const target = join(skillsDir, "retro");
 
   const useDev = args.flags.dev === "true";
-  const skillSrc = resolveSkillSource();
-
-  if (!skillSrc) {
-    console.error(
-      "skill source not found — run `retro setup --dev` from the retro repo, or use a compiled binary",
-    );
-    process.exit(1);
-  }
-
   if (existsSync(target)) {
     rmSync(target, { recursive: true, force: true });
   }
 
   if (useDev) {
+    const skillSrc = resolveSkillSource();
+    if (!skillSrc) {
+      console.error("`--dev` requires running from the retro repo (skill/ dir not found)");
+      process.exit(1);
+    }
     symlinkSync(skillSrc, target, "dir");
     console.log(`✓ symlinked ${skillSrc} → ${target} (dev mode)`);
+  } else if (Object.keys(EMBEDDED_SKILL_FILES).length > 0) {
+    extractEmbedded(target);
+    console.log(`✓ extracted embedded skill (${Object.keys(EMBEDDED_SKILL_FILES).length} files) → ${target}`);
   } else {
+    const skillSrc = resolveSkillSource();
+    if (!skillSrc) {
+      console.error(
+        "no embedded skill and no skill/ directory found; run `bun run scripts/build.ts generate` first",
+      );
+      process.exit(1);
+    }
     copyRecursive(skillSrc, target);
-    console.log(`✓ installed skill from ${skillSrc} → ${target}`);
+    console.log(`✓ copied skill from ${skillSrc} → ${target}`);
   }
 
   console.log(`\nNext: open Claude Code inside a project and run /retro-init`);
+}
+
+function extractEmbedded(target: string): void {
+  mkdirSync(target, { recursive: true });
+  for (const [rel, content] of Object.entries(EMBEDDED_SKILL_FILES)) {
+    const dst = join(target, rel);
+    mkdirSync(dirname(dst), { recursive: true });
+    writeFileSync(dst, content, "utf8");
+  }
 }
 
 function resolveSkillSource(): string | null {
