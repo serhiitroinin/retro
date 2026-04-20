@@ -43,7 +43,8 @@ export function sumTokens(events: Event[]): TokenTotals {
 }
 
 export function peakContextPct(session: Session): number {
-  let peak = 0;
+  let peakUsed = 0;
+  let declaredWindow = 200_000;
   for (const e of session.events) {
     if (e.type !== "assistant") continue;
     const u = e.message.usage;
@@ -52,11 +53,14 @@ export function peakContextPct(session: Session): number {
       (u.input_tokens ?? 0) +
       (u.cache_read_input_tokens ?? 0) +
       (u.cache_creation_input_tokens ?? 0);
+    if (used > peakUsed) peakUsed = used;
     const win = contextWindow(e.message.model);
-    const pct = used / win;
-    if (pct > peak) peak = pct;
+    if (win > declaredWindow) declaredWindow = win;
   }
-  return round(peak);
+  // jsonl stores base model id without [1m] variant marker — infer 1M tier
+  // when observed tokens exceed the declared window.
+  const effective = peakUsed > declaredWindow ? 1_000_000 : declaredWindow;
+  return round(peakUsed / effective);
 }
 
 function round(x: number): number {

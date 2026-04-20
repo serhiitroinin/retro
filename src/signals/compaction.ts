@@ -17,8 +17,10 @@ export function detectCompactions(events: Event[]): CompactionSignals {
   let slashCompacts = 0;
   for (const e of sorted) {
     if (e.type !== "user" || e.isSidechain) continue;
-    const text = getUserText(e).trim();
-    if (/^\/compact\b/i.test(text)) slashCompacts += 1;
+    const text = getUserText(e);
+    if (/<command-name>\/?compact\b/i.test(text) || /^\s*\/compact\b/i.test(text)) {
+      slashCompacts += 1;
+    }
   }
 
   let tokenCliffs = 0;

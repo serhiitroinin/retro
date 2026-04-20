@@ -4,6 +4,7 @@ import {
   windowFromFlags,
   filterSessionsByWindow,
   filterSessionsByProject,
+  filterEventsInWindow,
   type Args,
 } from "../lib/cli.ts";
 import { printJson, printHumanTable, printHumanKeyValue } from "../lib/output.ts";
@@ -61,16 +62,22 @@ function listSessions(args: Args): void {
   sessions.sort((a, b) => b.startTime - a.startTime);
 
   const rows = sessions.map((s) => {
-    const tokens = sumTokens(s.events);
-    const turns = s.events.filter((e) => e.type === "user" || e.type === "assistant").length;
+    const windowed = filterEventsInWindow(s.events, w);
+    const tokens = sumTokens(windowed);
+    const turns = windowed.filter((e) => e.type === "user" || e.type === "assistant").length;
+    const sidechain = windowed.filter((e) => Boolean(e.isSidechain)).length;
+    const firstTs = windowed[0]?.timestamp ? Date.parse(windowed[0].timestamp) : s.startTime;
+    const lastTs = windowed[windowed.length - 1]?.timestamp
+      ? Date.parse(windowed[windowed.length - 1]!.timestamp!)
+      : s.endTime;
     const models = tokens.models.map(modelShort).join(",");
     return {
       sessionId: s.sessionId.slice(0, 8),
       project: shortenSlug(s.projectSlug),
-      start: new Date(s.startTime).toISOString().slice(0, 16).replace("T", " "),
-      durationMin: Math.round(s.durationMs / 60_000),
+      start: new Date(firstTs).toISOString().slice(0, 16).replace("T", " "),
+      durationMin: Math.round((lastTs - firstTs) / 60_000),
       turns,
-      sidechain: s.sidechainEvents.length,
+      sidechain,
       tokens: tokens.input + tokens.output + tokens.cache_read,
       models,
     };
