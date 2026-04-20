@@ -1,93 +1,75 @@
 #!/usr/bin/env bun
+import { parseArgs, windowFromFlags, filterSessionsByWindow, filterSessionsByProject } from "./lib/cli.ts";
 import { loadAllSessions } from "./parse/sessions.ts";
-import type { Event } from "./parse/events.ts";
+import { run as sessionsCmd } from "./commands/sessions.ts";
+import { run as statsCmd } from "./commands/stats.ts";
+import { run as toolsCmd } from "./commands/tools.ts";
+import { run as tokensCmd } from "./commands/tokens.ts";
+import { run as contextPressureCmd } from "./commands/context-pressure.ts";
+import { printJson } from "./lib/output.ts";
 
-function parseDuration(s: string): number {
-  const m = s.match(/^(\d+)([mhdw])$/);
-  if (!m || !m[1] || !m[2]) {
-    throw new Error(`bad duration: ${s} (use 30m, 24h, 7d, 2w)`);
-  }
-  const n = Number(m[1]);
-  const unit = m[2];
-  const unitMs =
-    unit === "m" ? 60_000 : unit === "h" ? 3_600_000 : unit === "d" ? 86_400_000 : 604_800_000;
-  return n * unitMs;
-}
+const USAGE = `retro — personal coaching tool for Claude Code adoption
 
-function parseArgs(argv: string[]) {
-  const cmd = argv[2] ?? "";
-  const flags: Record<string, string> = {};
-  const positional: string[] = [];
-  for (let i = 3; i < argv.length; i++) {
-    const a = argv[i];
-    if (!a) continue;
-    if (a.startsWith("--")) {
-      const eq = a.indexOf("=");
-      if (eq >= 0) flags[a.slice(2, eq)] = a.slice(eq + 1);
-      else flags[a.slice(2)] = "true";
-    } else {
-      positional.push(a);
-    }
-  }
-  return { cmd, flags, positional };
-}
+commands:
+  retro sessions list [--since=7d] [--until=0d] [--project=.] [--min-duration=N] [--human]
+  retro sessions show <sessionId> [--human]
+  retro sessions timeline <sessionId> [--human]
 
-function countTools(events: Event[]): number {
-  let n = 0;
-  for (const e of events) {
-    if (e.type !== "assistant") continue;
-    const content = e.message.content;
-    if (!Array.isArray(content)) continue;
-    for (const block of content) {
-      if (block.type === "tool_use") n++;
-    }
-  }
-  return n;
-}
+  retro stats [--since=7d] [--groupby=day|weekday|hour|project|model] [--human]
+  retro tools [--since=7d] [--category=builtin|mcp|bash|subagent] [--human]
+  retro tokens [--since=7d] [--groupby=session|model|day] [--human]
+  retro context-pressure [--since=7d] [--human]
 
-function sumTokens(events: Event[]): number {
-  let n = 0;
-  for (const e of events) {
-    if (e.type !== "assistant") continue;
-    const u = e.message.usage;
-    if (!u) continue;
-    n += (u.input_tokens ?? 0) + (u.output_tokens ?? 0);
-  }
-  return n;
-}
-
-const { cmd, flags } = parseArgs(process.argv);
-
-switch (cmd) {
-  case "_debug-parse": {
-    const sinceMs = flags.since ? Date.now() - parseDuration(flags.since) : undefined;
-    const sessions = loadAllSessions(sinceMs);
-    sessions.sort((a, b) => a.startTime - b.startTime);
-    for (const s of sessions) {
-      const turns = s.events.filter((e) => e.type === "user" || e.type === "assistant").length;
-      console.log(
-        JSON.stringify({
-          sessionId: s.sessionId,
-          project: s.projectSlug,
-          start: new Date(s.startTime).toISOString(),
-          durationMin: Math.round(s.durationMs / 60_000),
-          turns,
-          main: s.mainEvents.length,
-          sidechain: s.sidechainEvents.length,
-          tools: countTools(s.events),
-          tokens: sumTokens(s.events),
-        }),
-      );
-    }
-    console.error(`\n[_debug-parse] ${sessions.length} sessions`);
-    break;
-  }
-  default:
-    console.log(`retro — personal coaching tool for Claude Code adoption
-
-usage:
   retro _debug-parse [--since=7d]
 
-(more commands land in subsequent phases — see PLAN.md)`);
-    if (cmd) process.exit(1);
+output is JSON by default; pass --human for readable tables.`;
+
+const args = parseArgs(process.argv);
+
+switch (args.cmd) {
+  case "sessions":
+    sessionsCmd(args);
+    break;
+  case "stats":
+    statsCmd(args);
+    break;
+  case "tools":
+    toolsCmd(args);
+    break;
+  case "tokens":
+    tokensCmd(args);
+    break;
+  case "context-pressure":
+    contextPressureCmd(args);
+    break;
+  case "_debug-parse":
+    debugParse(args);
+    break;
+  case "":
+  case "--help":
+  case "-h":
+    console.log(USAGE);
+    break;
+  default:
+    console.error(`unknown command: ${args.cmd}\n\n${USAGE}`);
+    process.exit(1);
+}
+
+function debugParse(args: ReturnType<typeof parseArgs>): void {
+  const w = windowFromFlags(args.flags);
+  let sessions = loadAllSessions(w.startMs);
+  sessions = filterSessionsByWindow(sessions, w);
+  sessions = filterSessionsByProject(sessions, args.flags.project);
+  sessions.sort((a, b) => a.startTime - b.startTime);
+  const rows = sessions.map((s) => ({
+    sessionId: s.sessionId,
+    project: s.projectSlug,
+    start: new Date(s.startTime).toISOString(),
+    durationMin: Math.round(s.durationMs / 60_000),
+    turns: s.events.filter((e) => e.type === "user" || e.type === "assistant").length,
+    main: s.mainEvents.length,
+    sidechain: s.sidechainEvents.length,
+  }));
+  printJson(rows);
+  console.error(`[_debug-parse] ${sessions.length} sessions`);
 }
