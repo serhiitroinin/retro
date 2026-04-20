@@ -10,6 +10,7 @@ import { run as strugglesCmd } from "./commands/struggles.ts";
 import { run as flowCmd } from "./commands/flow.ts";
 import { run as patternsCmd } from "./commands/patterns.ts";
 import { run as searchCmd } from "./commands/search.ts";
+import { run as vocabularyCmd } from "./commands/vocabulary.ts";
 import { printJson } from "./lib/output.ts";
 
 const USAGE = `retro — personal coaching tool for Claude Code adoption
@@ -28,6 +29,8 @@ commands:
   retro flow [--top=5] [--since=7d] [--human]
   retro patterns <regenerate-cycles|compactions|denials|idle-sessions|context-hits>
   retro search <regex> [--since=7d] [--human]
+
+  retro vocabulary [list|propose <tag> <rationale>|promote <tag>|sight <tag>] [--human]
 
   retro _debug-parse [--since=7d]
 
@@ -62,6 +65,10 @@ switch (args.cmd) {
     break;
   case "search":
     searchCmd(args);
+    break;
+  case "vocabulary":
+  case "vocab":
+    vocabularyCmd(args);
     break;
   case "_debug-parse":
     debugParse(args);

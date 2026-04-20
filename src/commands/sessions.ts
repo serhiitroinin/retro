@@ -9,6 +9,8 @@ import {
 import { printJson, printHumanTable, printHumanKeyValue } from "../lib/output.ts";
 import { sumTokens } from "../lib/tokens.ts";
 import { extractToolCalls, categorize } from "../lib/tools.ts";
+import { loadProjectVocabulary } from "../tags/vocabulary.ts";
+import { tagEvent } from "../tags/tagger.ts";
 
 export function run(args: Args): void {
   switch (args.sub) {
@@ -146,6 +148,7 @@ type SkeletonEvent = {
   name?: string;
   meta?: string;
   sidechain: boolean;
+  tags?: string[];
 };
 
 function eventSkeleton(e: Event): SkeletonEvent | null {
@@ -200,17 +203,24 @@ function showTimeline(args: Args): void {
     process.exit(1);
   }
 
+  const vocab = loadProjectVocabulary();
   const skeleton: SkeletonEvent[] = [];
   for (const e of s.events) {
     const sk = eventSkeleton(e);
-    if (sk) skeleton.push(sk);
+    if (!sk) continue;
+    if (vocab) {
+      const tags = tagEvent(e, vocab);
+      if (tags.length) sk.tags = tags;
+    }
+    skeleton.push(sk);
   }
 
   if (args.flags.human) {
     for (const ev of skeleton) {
       const indent = ev.sidechain ? "    " : "";
       const meta = ev.meta ? ` [${ev.meta}]` : "";
-      console.log(`${indent}${ev.time}  ${ev.kind.padEnd(9)} ${ev.name ?? ""}${meta}`);
+      const tags = ev.tags && ev.tags.length ? ` {${ev.tags.join(",")}}` : "";
+      console.log(`${indent}${ev.time}  ${ev.kind.padEnd(9)} ${ev.name ?? ""}${meta}${tags}`);
     }
   } else {
     printJson(skeleton);
