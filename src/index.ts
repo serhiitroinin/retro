@@ -11,11 +11,16 @@ import { run as flowCmd } from "./commands/flow.ts";
 import { run as patternsCmd } from "./commands/patterns.ts";
 import { run as searchCmd } from "./commands/search.ts";
 import { run as vocabularyCmd } from "./commands/vocabulary.ts";
+import { run as initCmd } from "./commands/init.ts";
+import { run as setupCmd } from "./commands/setup.ts";
 import { printJson } from "./lib/output.ts";
 
 const USAGE = `retro — personal coaching tool for Claude Code adoption
 
 commands:
+  retro setup [--dev]                  install/link the skill to ~/.claude/skills/retro/
+  retro init                           scaffold .retro/ and .retro-local/<user>/ in current repo
+
   retro sessions list [--since=7d] [--until=0d] [--project=.] [--min-duration=N] [--human]
   retro sessions show <sessionId> [--human]
   retro sessions timeline <sessionId> [--human]
@@ -69,6 +74,12 @@ switch (args.cmd) {
   case "vocabulary":
   case "vocab":
     vocabularyCmd(args);
+    break;
+  case "init":
+    initCmd(args);
+    break;
+  case "setup":
+    setupCmd(args);
     break;
   case "_debug-parse":
     debugParse(args);
